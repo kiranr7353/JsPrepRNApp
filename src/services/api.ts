@@ -170,6 +170,28 @@ export async function apiRequest<T = any>(
   }
 }
 
+export async function syncLoginWithBackend(idToken: string, refreshToken: string) {
+  return apiRequest<{ success?: boolean; data?: any; detail?: string }>('/user/login', 'POST', {
+    idToken,
+    refreshToken,
+  });
+}
+
+export async function syncRegistrationWithBackend(payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  idToken: string;
+  refreshToken: string;
+  code?: string;
+  phoneNumber?: string;
+  dob?: string | null;
+}) {
+  return apiRequest<{ success?: boolean; data?: any; detail?: string }>('/user/register', 'POST', payload);
+}
+
 // In-memory cache for API data to ensure super snappy mobile performance
 const memoryCache = {
   categories: null as Category[] | null,
@@ -283,7 +305,7 @@ export async function fetchTopicsFromBackend(categoryId: string): Promise<Topic[
     if (res && res.topics && Array.isArray(res.topics)) {
       const mappedTopics: Topic[] = res.topics.map((t: any, idx: number) => {
         const rawTopicId = t.topicId || t.topic_id || t.topicRef || t.id;
-        const topicReference = typeof rawTopicId === 'string'
+        const topicReference = typeof rawTopicId === 'string' 
           ? rawTopicId
           : rawTopicId?.path || rawTopicId?.name || rawTopicId?.id;
         const backendTopicId = topicReference?.split('/').filter(Boolean).pop();
@@ -295,6 +317,7 @@ export async function fetchTopicsFromBackend(categoryId: string): Promise<Topic[
         return {
           id: t.id || t.slug || backendTopicId || `topic-${idx}`,
           backendTopicId,
+          displayOrder: Number.isFinite(Number(t.displayOrder)) ? Number(t.displayOrder) : idx,
           title: t.topicName || 'Topic',
           summary: t.description || 'Comprehensive study modules and interview QA from backend.',
           level,
@@ -307,6 +330,7 @@ export async function fetchTopicsFromBackend(categoryId: string): Promise<Topic[
         };
       });
 
+      mappedTopics.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       memoryCache.topicsByCategoryId[normCatId] = mappedTopics;
 
       // Update category topics in cache
@@ -326,6 +350,49 @@ export async function fetchTopicsFromBackend(categoryId: string): Promise<Topic[
   // Fallback
   const fallbackCat = FALLBACK_CATEGORIES.find((c) => c.id === normCatId);
   return fallbackCat ? fallbackCat.topics : [];
+}
+
+/** Fetch the signed-in user's favorite topics for the home screen. */
+export async function fetchFavoriteTopicsFromBackend(): Promise<Topic[]> {
+  try {
+    const res = await apiRequest<{ success?: boolean; favoriteTopics?: any[] }>(
+      '/user/getFavoriteTopics',
+      'GET'
+    );
+    const favoriteTopics = res?.favoriteTopics || (res as any)?.data?.favoriteTopics || [];
+    if (!Array.isArray(favoriteTopics)) return [];
+
+    return favoriteTopics
+      .filter((topic: any) => topic?.enabled !== false)
+      .map((topic: any) => {
+        const rawCategoryId = topic.categoryId || topic.categoryRef || topic.category;
+        const categoryReference = typeof rawCategoryId === 'string'
+          ? rawCategoryId
+          : rawCategoryId?.path || rawCategoryId?.name || rawCategoryId?.id;
+        const categoryId = categoryReference?.split('/').filter(Boolean).pop();
+        const rawTopicId = topic.topicId || topic.id || topic.slug;
+        const topicReference = typeof rawTopicId === 'string'
+          ? rawTopicId
+          : rawTopicId?.path || rawTopicId?.name || rawTopicId?.id;
+        const topicId = topicReference?.split('/').filter(Boolean).pop();
+        return {
+        id: topicId,
+        backendTopicId: topicId,
+        categoryId,
+        displayOrder: Number.isFinite(Number(topic.displayOrder)) ? Number(topic.displayOrder) : undefined,
+        title: topic.topicName || topic.title || 'Topic',
+        summary: topic.description || 'Explore this interview preparation topic.',
+        imageUrl: topic.imageUrl || topic.image?.[0]?.url,
+        enabled: topic.enabled !== false,
+        level: 'Intermediate' as const,
+        subtopics: [],
+        };
+      })
+      .filter((topic: Topic) => Boolean(topic.id));
+  } catch (err: any) {
+    console.warn(`fetchFavoriteTopicsFromBackend error: ${err.message}`);
+    return [];
+  }
 }
 
 /**

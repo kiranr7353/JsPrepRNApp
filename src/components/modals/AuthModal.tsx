@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { X, Mail, Lock, User, Sparkles, AlertCircle } from 'lucide-react-native';
 import { auth, saveStoredUserData } from '../../services/firebase';
+import { syncLoginWithBackend, syncRegistrationWithBackend } from '../../services/api';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { UserProfile } from '../../types';
 
@@ -19,6 +20,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, user, onU
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,12 +43,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, user, onU
 
   const handleSubmit = async () => {
     if (!email || !password) { setError('Please fill in both email and password'); return; }
+    if (isRegister && password !== confirmPassword) { setError('Passwords do not match'); return; }
     setLoading(true);
     setError(null);
     try {
       const cred = isRegister
         ? await createUserWithEmailAndPassword(auth, email, password)
         : await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await cred.user.getIdToken();
+      const refreshToken = (cred.user as any).refreshToken || '';
+      const nameParts = name.trim().split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || email.split('@')[0];
+      const lastName = nameParts.slice(1).join(' ');
+
+      if (isRegister) {
+        await syncRegistrationWithBackend({
+          firstName,
+          lastName,
+          email,
+          password,
+          confirmPassword,
+          idToken,
+          refreshToken,
+          code: '+91',
+          phoneNumber: '',
+          dob: null,
+        });
+      } else {
+        await syncLoginWithBackend(idToken, refreshToken);
+      }
+
       const profile: UserProfile = {
         uid: cred.user.uid,
         email: cred.user.email,
@@ -85,9 +111,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, user, onU
               </TouchableOpacity>
             </View>
 
-            {/* Firebase badge */}
+            {/* Auth status */}
             <View style={styles.firebaseBadge}>
-              <Text style={styles.firebaseBadgeText}>Firebase: <Text style={{ fontWeight: 'bold' }}>jsprep-ed0c8</Text></Text>
+              <Text style={styles.firebaseBadgeText}>Signed in as: <Text style={{ fontWeight: 'bold' }}>{user.email || email || 'Guest Candidate'}</Text></Text>
               <View style={styles.onlinePill}><Text style={styles.onlinePillText}>Online</Text></View>
             </View>
 
@@ -115,6 +141,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, user, onU
                 <TextInput value={email} onChangeText={setEmail} placeholder="dev@example.com" placeholderTextColor="#64748b" style={styles.input} keyboardType="email-address" autoCapitalize="none" />
               </View>
             </View>
+
+            {isRegister && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <View style={styles.inputWrap}>
+                  <Lock size={14} color="#64748b" style={styles.inputIcon} />
+                  <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repeat password" placeholderTextColor="#64748b" style={styles.input} secureTextEntry />
+                </View>
+              </View>
+            )}
 
             <View style={styles.field}>
               <Text style={styles.label}>Password</Text>

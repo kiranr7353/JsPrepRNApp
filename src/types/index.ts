@@ -17,8 +17,12 @@ export interface Category {
 export interface Topic {
   id: string;
   backendTopicId?: string;
+  categoryId?: string;
+  displayOrder?: number;
   title: string;
   summary: string;
+  imageUrl?: string;
+  enabled?: boolean;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   subtopics: string[];
   keyPoints?: string[];

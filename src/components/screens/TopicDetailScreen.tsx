@@ -18,7 +18,7 @@ export function collectText(value: unknown): string[] {
   if (!value || typeof value !== 'object') return [];
 
   const record = value as Record<string, unknown>;
-  const fields = ['data', 'text', 'content', 'value', 'point', 'points', 'pointsData', 'description', 'explanation', 'title', 'header'];
+  const fields = ['data', 'text', 'content', 'value', 'point', 'points', 'pointsData', 'pointHeader', 'code', 'description', 'explanation', 'title', 'header'];
   return fields.flatMap((field) => collectText(record[field]));
 }
 
@@ -50,6 +50,21 @@ export function getMediaUrls(concept: any): string[] {
   return [...new Set(findUrls(concept))];
 }
 
+function sortBySequence<T extends Record<string, any>>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const aOrder = Number(a.item.displayOrder ?? a.item.order ?? a.item.sequence ?? a.item.sectionId ?? a.item.id);
+      const bOrder = Number(b.item.displayOrder ?? b.item.order ?? b.item.sequence ?? b.item.sectionId ?? b.item.id);
+      const aHasOrder = Number.isFinite(aOrder);
+      const bHasOrder = Number.isFinite(bOrder);
+      if (aHasOrder && bHasOrder && aOrder !== bOrder) return aOrder - bOrder;
+      if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
 export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, topic, onSelectConcept }) => {
   const [concepts, setConcepts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +89,7 @@ export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, 
   }, [category.id, topic.backendTopicId, topic.id]);
 
   const fallbackConcepts = topic.subtopics.map((name) => ({ name, description: 'Core concept for this topic.' }));
-  const visibleConcepts = concepts.length > 0 ? concepts : fallbackConcepts;
+  const visibleConcepts = sortBySequence(concepts.length > 0 ? concepts : fallbackConcepts);
   const studyGuide = getTopicStudyGuide(topic.id, category.id, topic.title);
 
   return (

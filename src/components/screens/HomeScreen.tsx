@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
-import { Code2, Atom, Server, Cloud, Box, Cpu, FileCode, Palette, Workflow, Layers, Terminal, Sparkles, ChevronRight, Flame, RefreshCw, Globe2 } from 'lucide-react-native';
+import { Code2, Atom, Server, Cloud, Box, Cpu, FileCode, Palette, Workflow, Layers, Terminal, Sparkles, ChevronRight, Flame, RefreshCw, Globe2, BookOpen } from 'lucide-react-native';
 import { Category, QuestionAnswer, UserProfile } from '../../types';
 import { CATEGORIES as FALLBACK_CATEGORIES, QUESTIONS_ANSWERS as FALLBACK_QA } from '../../data/prepData';
 
 interface HomeScreenProps {
   onSelectCategory: (category: Category) => void;
+  onSelectTopic: (topic: any) => void;
   onNavigateTab: (tab: any) => void;
   onSelectQuestion: (question: QuestionAnswer) => void;
   user: UserProfile;
   onOpenAICoach: () => void;
   categories?: Category[];
+  favoriteTopics?: any[];
   questions?: QuestionAnswer[];
   isLiveApi?: boolean;
   onRefreshApi?: () => void;
@@ -24,8 +26,9 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-  onSelectCategory, onNavigateTab, onSelectQuestion, user, onOpenAICoach,
+  onSelectCategory, onSelectTopic, onNavigateTab, onSelectQuestion, user, onOpenAICoach,
   categories = FALLBACK_CATEGORIES, questions = FALLBACK_QA,
+  favoriteTopics = [],
   isLiveApi = false, onRefreshApi, isSyncing = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -137,6 +140,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
         </TouchableOpacity>
+      )}
+
+      {favoriteTopics.length > 0 && (
+        <View style={styles.favoriteSection}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Favorite Topics</Text>
+              <Text style={styles.favoriteSubtitle}>Continue learning from your saved topics.</Text>
+            </View>
+            <Text style={styles.seeAll}>{favoriteTopics.length} saved</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favoriteList}>
+            {favoriteTopics.map((topic) => (
+              <TouchableOpacity
+                key={topic.id}
+                onPress={() => onSelectTopic(topic)}
+                style={styles.favoriteCard}
+                activeOpacity={0.85}
+              >
+                {topic.imageUrl ? (
+                  <Image source={{ uri: topic.imageUrl }} style={styles.favoriteImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.favoriteImageFallback}><BookOpen size={28} color="#60a5fa" /></View>
+                )}
+                <Text style={styles.favoriteTitle} numberOfLines={2}>{topic.title}</Text>
+                <Text style={styles.favoriteDescription} numberOfLines={3}>{topic.summary}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* Categories Grid */}
@@ -253,6 +286,14 @@ const styles = StyleSheet.create({
   },
   clearBtn: { position: 'absolute', right: 12, top: 10 },
   clearText: { fontSize: 12, color: '#94a3b8' },
+  favoriteSection: { gap: 10 },
+  favoriteSubtitle: { fontSize: 11, color: '#64748b', marginTop: 3 },
+  favoriteList: { gap: 12, paddingRight: 16 },
+  favoriteCard: { width: 235, paddingBottom: 12, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#1e293b', borderRadius: 12, overflow: 'hidden' },
+  favoriteImage: { width: '100%', height: 132, backgroundColor: '#1e293b' },
+  favoriteImageFallback: { width: '100%', height: 132, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b' },
+  favoriteTitle: { fontSize: 14, color: '#f8fafc', fontWeight: '800', marginHorizontal: 12, marginTop: 10 },
+  favoriteDescription: { fontSize: 11, color: '#94a3b8', lineHeight: 16, marginHorizontal: 12, marginTop: 6 },
   dailyCard: {
     backgroundColor: '#0f172a', borderWidth: 1, borderColor: 'rgba(96,165,250,0.3)',
     borderRadius: 12, padding: 14,

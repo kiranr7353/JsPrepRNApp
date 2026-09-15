@@ -19,7 +19,7 @@ import {
 } from './src/services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CATEGORIES as DEFAULT_CATEGORIES, QUESTIONS_ANSWERS as DEFAULT_QA, PROGRAMMING_QUESTIONS as DEFAULT_PQA } from './src/data/prepData';
-import { syncAllDataFromBackend, subscribeToApiStatus, BackendApiStatus } from './src/services/api';
+import { fetchFavoriteTopicsFromBackend, syncAllDataFromBackend, subscribeToApiStatus, BackendApiStatus } from './src/services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('home');
@@ -32,6 +32,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [questions, setQuestions] = useState<QuestionAnswer[]>(DEFAULT_QA);
   const [programmingQuestions, setProgrammingQuestions] = useState<ProgrammingQuestion[]>(DEFAULT_PQA);
+  const [favoriteTopics, setFavoriteTopics] = useState<Topic[]>([]);
   const [isSyncingApi, setIsSyncingApi] = useState(false);
   const [isLiveApi, setIsLiveApi] = useState(false);
 
@@ -56,6 +57,7 @@ export default function App() {
         if (data.categories.length > 0) setCategories(data.categories);
         if (data.questions.length > 0) setQuestions(data.questions);
         if (data.programming.length > 0) setProgrammingQuestions(data.programming);
+        setFavoriteTopics(await fetchFavoriteTopicsFromBackend());
         setIsLiveApi(data.isLive);
       } catch (e) {
         console.warn('Backend sync error:', e);
@@ -75,6 +77,7 @@ export default function App() {
       if (data.categories.length > 0) setCategories(data.categories);
       if (data.questions.length > 0) setQuestions(data.questions);
       if (data.programming.length > 0) setProgrammingQuestions(data.programming);
+      setFavoriteTopics(await fetchFavoriteTopicsFromBackend());
       setIsLiveApi(data.isLive);
     } catch (e) {
       console.warn('Refresh error:', e);
@@ -99,6 +102,11 @@ export default function App() {
             saveStoredUserData(updated);
             return updated;
           });
+          fetchFavoriteTopicsFromBackend()
+            .then(setFavoriteTopics)
+            .catch((error) => console.warn('Favorite topics refresh error:', error));
+        } else {
+          setFavoriteTopics([]);
         }
       });
       return () => unsub();
@@ -197,11 +205,34 @@ export default function App() {
             setIsTopicsView(true);
             setActiveTab('qa');
           }}
+          onSelectTopic={(topic) => {
+            const normalize = (value?: string) => value?.split('/').filter(Boolean).pop()?.toLowerCase();
+            const topicId = normalize(topic.backendTopicId || topic.id);
+            const categoryId = normalize(topic.categoryId);
+            const category = categories.find((cat) => {
+              const matchesCategory = !categoryId || normalize(cat.id) === categoryId;
+              const matchesTopic = cat.topics.some((item) =>
+                normalize(item.backendTopicId || item.id) === topicId || item.title.toLowerCase() === topic.title.toLowerCase()
+              );
+              return matchesCategory && matchesTopic;
+            }) || categories.find((cat) => normalize(cat.id) === categoryId) || categories.find((cat) =>
+              cat.topics.some((item) => normalize(item.backendTopicId || item.id) === topicId || item.title.toLowerCase() === topic.title.toLowerCase())
+            );
+            if (category) {
+              setSelectedCategory(category);
+              setSelectedTopic(topic);
+              setSelectedConcept(null);
+              setSelectedQuestion(null);
+              setIsTopicsView(true);
+              setActiveTab('qa');
+            }
+          }}
           onNavigateTab={navigateTab}
           onSelectQuestion={(q) => { setSelectedQuestion(q); setActiveTab('qa'); }}
           user={user}
           onOpenAICoach={() => { setAiCoachPrompt(undefined); setIsAICoachOpen(true); }}
           categories={categories}
+          favoriteTopics={favoriteTopics}
           questions={questions}
           isLiveApi={isLiveApi}
           onRefreshApi={handleRefreshApiData}
