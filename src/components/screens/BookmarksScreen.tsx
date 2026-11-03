@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Bookmark, Trash2, BookOpen, Code2, Database, RefreshCw, CheckCircle2, UploadCloud } from 'lucide-react-native';
-import { QuestionAnswer } from '../../types';
+import { QuestionAnswer, ProgrammingQuestion } from '../../types';
 import { QUESTIONS_ANSWERS, PROGRAMMING_QUESTIONS } from '../../data/prepData';
 import { seedCurriculumToFirestore } from '../../services/firebase';
 
@@ -12,17 +12,20 @@ interface BookmarksScreenProps {
   onSelectQuestion: (question: QuestionAnswer) => void;
   onNavigateTab: (tab: any) => void;
   isFirebaseConnected: boolean;
+  questions?: QuestionAnswer[];
+  programmingQuestions?: ProgrammingQuestion[];
 }
 
 export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
   bookmarkedQAIds, bookmarkedPQAIds, onToggleBookmark, onSelectQuestion, onNavigateTab,
+  questions = QUESTIONS_ANSWERS, programmingQuestions = PROGRAMMING_QUESTIONS,
 }) => {
   const [activeTab, setActiveTab] = useState<'qa' | 'coding'>('qa');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
-  const bookmarkedQuestions = QUESTIONS_ANSWERS.filter((q) => bookmarkedQAIds.includes(q.id));
-  const bookmarkedProblems = PROGRAMMING_QUESTIONS.filter((p) => bookmarkedPQAIds.includes(p.id));
+  const bookmarkedQuestions = questions.filter((q) => bookmarkedQAIds.includes(q.id));
+  const bookmarkedProblems = programmingQuestions.filter((p) => bookmarkedPQAIds.includes(p.id));
 
   const handleSync = async () => {
     setIsSyncing(true);
