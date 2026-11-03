@@ -3,10 +3,12 @@ import {
   View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Image, FlatList,
 } from 'react-native';
-import { Search, Bookmark, ChevronDown, ChevronUp, Eye, EyeOff, Filter, RefreshCw } from 'lucide-react-native';
+import { Search, Bookmark, ChevronDown, ChevronUp, Eye, EyeOff, Filter, Plus, Pencil, Trash2 } from 'lucide-react-native';
 import { Category, QuestionAnswer } from '../../types';
 import { QUESTIONS_ANSWERS as FALLBACK_QA, CATEGORIES as FALLBACK_CATEGORIES } from '../../data/prepData';
 import { fetchInterviewQAFromBackend } from '../../services/api';
+import { AddEditQAModal } from '../admin/AddEditQAModal';
+import { FormQAAnswer } from '../../services/adminApi';
 
 interface InterviewQAScreenProps {
   initialCategoryId?: string;
@@ -16,15 +18,21 @@ interface InterviewQAScreenProps {
   categories?: Category[];
   questions?: QuestionAnswer[];
   onRefresh?: () => void;
+  user?: import('../../types').UserProfile;
 }
 
 const PAGE_SIZE = 40;
 
 export const InterviewQAScreen: React.FC<InterviewQAScreenProps> = ({
   initialCategoryId, bookmarkedIds, onToggleBookmark, selectedQuestion,
-  categories = FALLBACK_CATEGORIES, questions = FALLBACK_QA, onRefresh,
+  categories = FALLBACK_CATEGORIES, questions = FALLBACK_QA, onRefresh, user,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState(initialCategoryId || 'all');
+  const [qaModal, setQaModal] = useState<{
+    visible: boolean;
+    mode: 'add' | 'edit' | 'delete';
+    existing?: { id: string; question: string; answers: FormQAAnswer[]; enabled?: boolean };
+  }>({ visible: false, mode: 'add' });
   const [selectedDifficulty, setSelectedDifficulty] = useState<'All' | 'Junior' | 'Mid' | 'Senior'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(selectedQuestion?.id ?? questions[0]?.id ?? null);
@@ -137,9 +145,20 @@ export const InterviewQAScreen: React.FC<InterviewQAScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.countText}>
-        Showing {Math.min(visibleCount, filteredQuestions.length)} of {filteredQuestions.length} questions
-      </Text>
+      <View style={styles.countRow}>
+        <Text style={styles.countText}>
+          Showing {Math.min(visibleCount, filteredQuestions.length)} of {filteredQuestions.length} questions
+        </Text>
+        {user?.isAdmin && (
+          <TouchableOpacity
+            onPress={() => setQaModal({ visible: true, mode: 'add' })}
+            style={styles.addQBtn}
+          >
+            <Plus size={12} color="#fff" />
+            <Text style={styles.addQBtnText}>Add Question</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Questions */}
       <FlatList
@@ -192,6 +211,22 @@ export const InterviewQAScreen: React.FC<InterviewQAScreenProps> = ({
                   </View>
                 </View>
                 <View style={styles.cardActions}>
+                  {user?.isAdmin && (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => setQaModal({ visible: true, mode: 'edit', existing: { id: q.id, question: q.question, answers: [], enabled: true } })}
+                        style={styles.adminActionBtn}
+                      >
+                        <Pencil size={13} color="#60a5fa" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setQaModal({ visible: true, mode: 'delete', existing: { id: q.id, question: q.question, answers: [], enabled: true } })}
+                        style={styles.adminActionBtn}
+                      >
+                        <Trash2 size={13} color="#f87171" />
+                      </TouchableOpacity>
+                    </>
+                  )}
                   <TouchableOpacity
                     onPress={() => onToggleBookmark(q.id, 'qa')}
                     style={[styles.bookmarkBtn, isBookmarked && styles.bookmarkBtnActive]}
@@ -249,6 +284,16 @@ export const InterviewQAScreen: React.FC<InterviewQAScreenProps> = ({
           );
         }}
       />
+
+      <AddEditQAModal
+        visible={qaModal.visible}
+        mode={qaModal.mode}
+        categoryId={selectedCategory === 'all' ? (categories[0]?.id || '') : selectedCategory}
+        topicId=""
+        existingQuestion={qaModal.existing}
+        onClose={() => setQaModal((p) => ({ ...p, visible: false }))}
+        onSuccess={() => onRefresh?.()}
+      />
     </View>
   );
 };
@@ -286,7 +331,11 @@ const styles = StyleSheet.create({
   },
   quizBtnActive: { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)' },
   quizBtnText: { fontSize: 11, color: '#94a3b8' },
-  countText: { fontSize: 11, color: '#64748b', paddingHorizontal: 12, marginTop: 8, marginBottom: 4 },
+  countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, marginTop: 8, marginBottom: 4 },
+  countText: { fontSize: 11, color: '#64748b' },
+  addQBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  addQBtnText: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  adminActionBtn: { padding: 5, borderRadius: 6, backgroundColor: '#1e293b' },
   questionList: { flex: 1, minHeight: 0 },
   listContent: { padding: 12, gap: 10, paddingBottom: 32 },
   emptyBox: { alignItems: 'center', paddingVertical: 48, backgroundColor: '#0f172a', borderRadius: 16, borderWidth: 1, borderColor: '#1e293b' },

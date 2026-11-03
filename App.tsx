@@ -15,7 +15,7 @@ import { ReactNativeExportScreen } from './src/components/screens/ReactNativeExp
 import { AuthModal } from './src/components/modals/AuthModal';
 import { AICoachModal } from './src/components/modals/AICoachModal';
 import {
-  loadStoredUserData, getStoredUserData, saveStoredUserData, syncBookmarkToFirestore, auth,
+  loadStoredUserData, getStoredUserData, saveStoredUserData, syncBookmarkToFirestore, auth, checkIsAdmin,
 } from './src/services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CATEGORIES as DEFAULT_CATEGORIES, QUESTIONS_ANSWERS as DEFAULT_QA, PROGRAMMING_QUESTIONS as DEFAULT_PQA } from './src/data/prepData';
@@ -91,16 +91,19 @@ export default function App() {
     try {
       const unsub = onAuthStateChanged(auth, (fbUser) => {
         if (fbUser) {
-          setUser((prev) => {
-            const updated: UserProfile = {
-              ...prev,
-              uid: fbUser.uid,
-              email: fbUser.email,
-              displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
-              isGuest: false,
-            };
-            saveStoredUserData(updated);
-            return updated;
+          checkIsAdmin(fbUser.uid).then((isAdmin) => {
+            setUser((prev) => {
+              const updated: UserProfile = {
+                ...prev,
+                uid: fbUser.uid,
+                email: fbUser.email,
+                displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+                isGuest: false,
+                isAdmin,
+              };
+              saveStoredUserData(updated);
+              return updated;
+            });
           });
           fetchFavoriteTopicsFromBackend()
             .then(setFavoriteTopics)
@@ -244,9 +247,9 @@ export default function App() {
       if (isTopicsView && selectedCategory) {
         if (selectedTopic) {
           if (selectedConcept) {
-            return <ConceptDetailScreen category={selectedCategory} topic={selectedTopic} concept={selectedConcept} />;
+            return <ConceptDetailScreen category={selectedCategory} topic={selectedTopic} concept={selectedConcept} user={user} />;
           }
-          return <TopicDetailScreen category={selectedCategory} topic={selectedTopic} onSelectConcept={setSelectedConcept} />;
+          return <TopicDetailScreen category={selectedCategory} topic={selectedTopic} onSelectConcept={setSelectedConcept} user={user} />;
         }
         return (
           <TopicsScreen
@@ -265,6 +268,7 @@ export default function App() {
           categories={categories}
           questions={questions}
           onRefresh={handleRefreshApiData}
+          user={user}
         />
       );
     }
@@ -286,6 +290,8 @@ export default function App() {
           onSelectQuestion={(q) => { setSelectedQuestion(q); setActiveTab('qa'); }}
           onNavigateTab={navigateTab}
           isFirebaseConnected={true}
+          questions={questions}
+          programmingQuestions={programmingQuestions}
         />
       );
     }

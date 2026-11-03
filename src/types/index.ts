@@ -79,6 +79,7 @@ export interface UserProfile {
   displayName: string | null;
   photoURL?: string | null;
   isGuest: boolean;
+  isAdmin?: boolean;
   bookmarkedQAIds: string[];
   bookmarkedPQAIds: string[];
   completedQuestions: string[];

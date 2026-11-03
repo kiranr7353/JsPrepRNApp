@@ -398,9 +398,9 @@ export async function fetchFavoriteTopicsFromBackend(): Promise<Topic[]> {
 /**
  * Fetch concepts and detailed notes for a topic from backend
  */
-export async function fetchConceptsFromBackend(topicId: string, categoryId: string): Promise<any[]> {
+export async function fetchConceptsFromBackend(topicId: string, categoryId: string, forceRefresh = false): Promise<any[]> {
   const cacheKey = `${categoryId}-${topicId}`;
-  if (memoryCache.conceptsByTopic[cacheKey]) {
+  if (!forceRefresh && memoryCache.conceptsByTopic[cacheKey]) {
     return memoryCache.conceptsByTopic[cacheKey];
   }
 

@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BookOpen, CircleCheck } from 'lucide-react-native';
-import { Category, Topic } from '../../types';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ImageBackground } from 'react-native';
+import { BookOpen, CircleCheck, Pencil, Trash2, Plus } from 'lucide-react-native';
+import { Category, Topic, UserProfile } from '../../types';
 import { fetchConceptsFromBackend } from '../../services/api';
 import { getTopicStudyGuide } from '../../data/topicDetails';
+import { AddEditConceptModal } from '../admin/AddEditConceptModal';
 
 interface TopicDetailScreenProps {
   category: Category;
   topic: Topic;
   onSelectConcept: (concept: any) => void;
+  user?: UserProfile;
 }
 
 export function collectText(value: unknown): string[] {
@@ -65,10 +67,25 @@ function sortBySequence<T extends Record<string, any>>(items: T[]): T[] {
     .map(({ item }) => item);
 }
 
-export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, topic, onSelectConcept }) => {
+export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, topic, onSelectConcept, user }) => {
   const [concepts, setConcepts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
+  const [conceptModal, setConceptModal] = useState<{ visible: boolean; mode: 'add' | 'edit' | 'delete'; existingTitle?: string }>({ visible: false, mode: 'add' });
+
+  const refreshConcepts = async (successMessage?: string) => {
+    setIsLoading(true);
+    try {
+      const items = await fetchConceptsFromBackend(topic.backendTopicId || topic.id, category.id, true);
+      setConcepts(items);
+      setIsLive(items.length > 0);
+    } catch {
+      setConcepts([]);
+    } finally {
+      setIsLoading(false);
+    }
+    if (successMessage) Alert.alert('Success', successMessage);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -94,14 +111,24 @@ export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, 
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <View style={styles.hero}>
-        <View style={styles.iconBox}><BookOpen size={22} color="#60a5fa" /></View>
-        <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>{category.title.toUpperCase()}</Text>
-          <Text style={styles.title}>{topic.title}</Text>
-          <Text style={styles.level}>{topic.level}</Text>
+      {topic.imageUrl ? (
+        <ImageBackground source={{ uri: topic.imageUrl }} style={styles.coverImage} resizeMode="cover">
+          <View style={styles.coverOverlay}>
+            <Text style={styles.eyebrow}>{category.title.toUpperCase()}</Text>
+            <Text style={styles.titleOnImage}>{topic.title}</Text>
+            <Text style={styles.levelOnImage}>{topic.level}</Text>
+          </View>
+        </ImageBackground>
+      ) : (
+        <View style={styles.hero}>
+          <View style={styles.iconBox}><BookOpen size={22} color="#60a5fa" /></View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.eyebrow}>{category.title.toUpperCase()}</Text>
+            <Text style={styles.title}>{topic.title}</Text>
+            <Text style={styles.level}>{topic.level}</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.overviewCard}>
         <Text style={styles.sectionTitle}>Overview</Text>
@@ -124,27 +151,64 @@ export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, 
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Concepts in this topic</Text>
-        <Text style={styles.count}>{visibleConcepts.length}</Text>
+        <View style={styles.sectionHeaderRight}>
+          <Text style={styles.count}>{visibleConcepts.length}</Text>
+          {user?.isAdmin && (
+            <TouchableOpacity onPress={() => setConceptModal({ visible: true, mode: 'add' })} style={styles.addBtn}>
+              <Plus size={14} color="#fff" />
+              <Text style={styles.addBtnText}>Add</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={styles.conceptList}>
         {visibleConcepts.map((concept, index) => {
           const name = concept.name || concept.title || concept.conceptName || concept.concept_title || `Concept ${index + 1}`;
-          const guideNote = studyGuide.subtopicNotes.find((note) => note.name.toLowerCase() === name.toLowerCase());
-          const textBlocks = getConceptText(concept, guideNote);
-          const mediaUrls = getMediaUrls(concept);
           return (
             <TouchableOpacity key={`${name}-${index}`} onPress={() => onSelectConcept(concept)} activeOpacity={0.8} style={styles.conceptCard}>
               <View style={styles.conceptNumber}><Text style={styles.numberText}>{String(index + 1).padStart(2, '0')}</Text></View>
               <View style={styles.conceptCopy}>
                 <Text style={styles.conceptTitle}>{name}</Text>
-                {textBlocks.map((text, textIndex) => <Text key={`${text}-${textIndex}`} style={textIndex === 0 ? styles.conceptDescription : styles.conceptPoints}>{textIndex === 0 ? text : `• ${text}`}</Text>)}
-                {mediaUrls.map((url: string) => <Image key={url} source={{ uri: url }} style={styles.snippetImage} resizeMode="contain" />)}
               </View>
+              {user?.isAdmin && (
+                <View style={styles.adminActions}>
+                  <TouchableOpacity
+                    onPress={() => setConceptModal({ visible: true, mode: 'edit', existingTitle: name })}
+                    style={styles.adminBtn}
+                  >
+                    <Pencil size={12} color="#60a5fa" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setConceptModal({ visible: true, mode: 'delete', existingTitle: name })}
+                    style={styles.adminBtn}
+                  >
+                    <Trash2 size={12} color="#f87171" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
       </View>
+
+      <AddEditConceptModal
+        visible={conceptModal.visible}
+        mode={conceptModal.mode}
+        categoryId={category.id}
+        topicId={topic.backendTopicId || topic.id}
+        existingTitle={conceptModal.existingTitle}
+        nextConceptId={visibleConcepts.length + 1}
+        onClose={() => setConceptModal((p) => ({ ...p, visible: false }))}
+        onSuccess={() => {
+          setConceptModal((p) => ({ ...p, visible: false }));
+          const msg =
+            conceptModal.mode === 'add' ? 'Concept added successfully!' :
+            conceptModal.mode === 'edit' ? 'Concept updated successfully!' :
+            'Concept deleted successfully!';
+          refreshConcepts(msg);
+        }}
+      />
     </ScrollView>
   );
 };
@@ -152,6 +216,10 @@ export const TopicDetailScreen: React.FC<TopicDetailScreenProps> = ({ category, 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#020617' },
   content: { padding: 16, paddingBottom: 32, gap: 16 },
+  coverImage: { width: '100%', height: 180, borderRadius: 14, overflow: 'hidden' },
+  coverOverlay: { flex: 1, backgroundColor: 'rgba(2,6,23,0.55)', justifyContent: 'flex-end', padding: 16, borderRadius: 14 },
+  titleOnImage: { fontSize: 22, color: '#f8fafc', fontWeight: '800', marginTop: 4 },
+  levelOnImage: { fontSize: 11, color: '#fbbf24', fontWeight: '700', marginTop: 4 },
   hero: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 14 },
   iconBox: { width: 46, height: 46, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(96,165,250,0.14)', marginRight: 12 },
   heroCopy: { flex: 1 },
@@ -167,7 +235,12 @@ const styles = StyleSheet.create({
   takeawayRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   takeawayText: { flex: 1, fontSize: 12, color: '#cbd5e1', lineHeight: 18 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   count: { fontSize: 11, color: '#60a5fa', fontWeight: '700' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  addBtnText: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  adminActions: { flexDirection: 'column', gap: 4, paddingLeft: 6 },
+  adminBtn: { padding: 4, borderRadius: 6, backgroundColor: '#1e293b' },
   conceptList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   conceptCard: { width: '48%', minHeight: 88, flexDirection: 'row', padding: 12, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#1e293b', borderRadius: 10 },
   conceptNumber: { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', marginRight: 9 },
@@ -176,5 +249,4 @@ const styles = StyleSheet.create({
   conceptTitle: { fontSize: 12, color: '#f8fafc', fontWeight: '700' },
   conceptDescription: { fontSize: 10, color: '#94a3b8', lineHeight: 15, marginTop: 5 },
   conceptPoints: { fontSize: 10, color: '#60a5fa', lineHeight: 15, marginTop: 5 },
-  snippetImage: { width: '100%', height: 120, marginTop: 8, borderRadius: 6, backgroundColor: '#020617' },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Image, ScrollView, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { BookOpen, ChevronRight } from 'lucide-react-native';
 import { Category, Topic } from '../../types';
 
@@ -33,6 +33,9 @@ export const TopicsScreen: React.FC<TopicsScreenProps> = ({ category, onOpenQues
     <View style={styles.topicList}>
       {category.topics.map((topic, index) => (
         <TouchableOpacity key={topic.id} style={styles.topicCard} onPress={() => onSelectTopic(topic)} activeOpacity={0.8}>
+          {topic.imageUrl ? (
+            <Image source={{ uri: topic.imageUrl }} style={styles.topicImage} resizeMode="cover" />
+          ) : null}
           <View style={styles.topicHeader}>
             <View style={styles.number}><Text style={styles.numberText}>{String(index + 1).padStart(2, '0')}</Text></View>
             <View style={styles.topicHeading}>
@@ -77,18 +80,19 @@ const styles = StyleSheet.create({
   sectionSubtitle: { fontSize: 11, color: '#64748b', marginTop: 3 },
   count: { fontSize: 11, color: '#60a5fa', fontWeight: '700' },
   topicList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  topicCard: { width: '48%', padding: 14, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#1e293b', borderRadius: 12 },
-  topicHeader: { flexDirection: 'row', alignItems: 'center' },
+  topicCard: { width: '48%', backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#1e293b', borderRadius: 12, overflow: 'hidden' },
+  topicImage: { width: '100%', height: 90 },
+  topicHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 14 },
   number: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', marginRight: 10 },
   numberText: { fontSize: 11, color: '#60a5fa', fontWeight: '800' },
   topicHeading: { flex: 1 },
   topicTitle: { fontSize: 14, color: '#f8fafc', fontWeight: '700' },
   level: { fontSize: 10, color: '#fbbf24', fontWeight: '700', marginTop: 3 },
-  summary: { fontSize: 12, color: '#94a3b8', lineHeight: 18, marginTop: 12 },
-  concepts: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  summary: { fontSize: 12, color: '#94a3b8', lineHeight: 18, marginTop: 12, paddingHorizontal: 14 },
+  concepts: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12, paddingHorizontal: 14 },
   conceptPill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: '#1e293b' },
   conceptText: { fontSize: 10, color: '#cbd5e1' },
-  topicAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 12 },
+  topicAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 12, paddingHorizontal: 14, paddingBottom: 14 },
   topicActionText: { fontSize: 11, color: '#60a5fa', fontWeight: '700' },
   questionsButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 9, backgroundColor: '#2563eb' },
   questionsButtonText: { fontSize: 12, color: '#fff', fontWeight: '700' },

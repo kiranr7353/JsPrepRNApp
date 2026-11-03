@@ -17,6 +17,9 @@ import {
   writeBatch,
   arrayUnion,
   arrayRemove,
+  query,
+  where,
+  limit,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CATEGORIES, QUESTIONS_ANSWERS, PROGRAMMING_QUESTIONS } from '../data/prepData';
@@ -170,10 +173,15 @@ export function mapFirestoreQADoc(docId: string, data: any): QuestionAnswer {
             pointsData.push({ pointHeader: pt.pointHeader || '', value: pt.value || '', code: pt.code || '' });
           }
           if (pt.code && !codeSnippet) codeSnippet = pt.code;
+          const ptSnips = pt.snippet || pt.snippets;
+          if (Array.isArray(ptSnips)) {
+            ptSnips.forEach((snip: any) => { if (snip?.url) snippets.push(snip); });
+          }
         });
       }
-      if (Array.isArray(block.snippets)) {
-        block.snippets.forEach((snip: any) => { if (snip?.url) snippets.push(snip); });
+      const blockSnips = block.snippet || block.snippets;
+      if (Array.isArray(blockSnips)) {
+        blockSnips.forEach((snip: any) => { if (snip?.url) snippets.push(snip); });
       }
     });
   } else if (typeof data.answer === 'string') {
@@ -305,4 +313,42 @@ export async function fetchFirestoreCategories(questionsList?: QuestionAnswer[])
 
 export async function fetchRemoteQuestions(): Promise<QuestionAnswer[]> {
   return fetchFirestoreInterviewQA();
+}
+
+function isAdminRole(data: any): boolean {
+  return (
+    data?.role === 'admin' ||
+    data?.role === 'superAdmin' ||
+    data?.isAdmin === true ||
+    data?.userType === 'admin' ||
+    data?.admin === true
+  );
+}
+
+export async function checkIsAdmin(uid: string): Promise<boolean> {
+  if (!uid || uid.startsWith('guest-')) return false;
+  try {
+    // Try 1: doc ID === uid (most common pattern)
+    const directSnap = await getDoc(doc(db, 'users', uid));
+    if (directSnap.exists()) {
+      const result = isAdminRole(directSnap.data());
+      console.log('[checkIsAdmin] direct hit, role:', directSnap.data()?.role, 'isAdmin:', result);
+      return result;
+    }
+
+    // Try 2: uid stored as a field (auto-generated doc IDs)
+    const q = query(collection(db, 'users'), where('uid', '==', uid), limit(1));
+    const qSnap = await getDocs(q);
+    if (!qSnap.empty) {
+      const data = qSnap.docs[0].data();
+      const result = isAdminRole(data);
+      console.log('[checkIsAdmin] query hit, role:', data?.role, 'isAdmin:', result);
+      return result;
+    }
+
+    console.log('[checkIsAdmin] no user doc found for uid:', uid);
+  } catch (err) {
+    console.warn('[checkIsAdmin] error:', err);
+  }
+  return false;
 }
